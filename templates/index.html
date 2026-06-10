@@ -1362,6 +1362,10 @@ async function renderFileManagerList() {
 
   let html = '';
   allFiles.forEach((f, i) => {
+    // 路径中的 & 和 " 需要 HTML 转义（用于 innerHTML）
+    const escHtml = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const pathAttr = escHtml(f.path);
+    const nameAttr = escHtml(f.name);
     const sizeStr = f.size < 1024 ? f.size + ' B' :
                     f.size < 1024*1024 ? (f.size/1024).toFixed(1) + ' KB' :
                     (f.size/(1024*1024)).toFixed(2) + ' MB';
@@ -1380,13 +1384,26 @@ async function renderFileManagerList() {
           <div style="font-size:12px;${srcStyle}margin-top:2px;">${srcTag} · ${sizeStr}</div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;margin-left:12px;">
-          <button class="btn btn-outline btn-xs" onclick="selectFile('${f.path.replace(/'/g, "\\'")}');closeModal('file-manager-modal')">📂 打开</button>
-          <button class="btn btn-danger btn-xs" onclick="deleteFileFromManager('${f.path.replace(/'/g, "\\'")}', '${f.name.replace(/'/g, "\\'")}')">🗑 删除</button>
+          <button class="btn btn-outline btn-xs fm-open-btn" data-path="${pathAttr}">📂 打开</button>
+          <button class="btn btn-danger btn-xs fm-del-btn" data-path="${pathAttr}" data-name="${nameAttr}">🗑 删除</button>
         </div>
-      </div>`;
+      </div>`;`
   });
 
   body.innerHTML = html;
+
+  // 用事件委托处理按钮点击（避免onclick中反斜杠转义问题）
+  body.querySelectorAll('.fm-open-btn').forEach(btn => {
+    btn.onclick = function() {
+      selectFile(this.dataset.path);
+      closeModal('file-manager-modal');
+    };
+  });
+  body.querySelectorAll('.fm-del-btn').forEach(btn => {
+    btn.onclick = function() {
+      deleteFileFromManager(this.dataset.path, this.dataset.name);
+    };
+  });
 }
 
 async function deleteFileFromManager(path, name) {
