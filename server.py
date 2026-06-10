@@ -20,6 +20,15 @@ from flask import Flask, request, jsonify, send_file
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
+
+@app.after_request
+def add_no_cache(response):
+    """禁止缓存（确保前端总是加载最新代码）"""
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / 'uploads'
 TEMPLATES_DIR = BASE_DIR / 'templates'
