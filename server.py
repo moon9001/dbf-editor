@@ -310,13 +310,12 @@ def list_files():
             'size': f.stat().st_size,
             'source': 'uploads'
         })
-    # 添加当前项目默认文件
-    default_dbf = BASE_DIR.parent / '80106BBK.dbf'
-    if default_dbf.exists():
-        files.insert(0, {
-            'name': default_dbf.name,
-            'path': str(default_dbf.absolute()),
-            'size': default_dbf.stat().st_size,
+    # 扫描父目录下的 DBF 文件（默认数据文件）
+    for f in sorted(BASE_DIR.parent.glob('*.dbf')):
+        files.append({
+            'name': f.name,
+            'path': str(f.absolute()),
+            'size': f.stat().st_size,
             'source': 'default'
         })
     return jsonify({'files': files})
@@ -578,32 +577,26 @@ def create_table():
 
 @app.route('/api/file/delete', methods=['POST'])
 def delete_file():
-    """删除 uploads 目录中的 DBF 文件（安全限制：仅允许删除 uploads 目录下的文件）"""
+    """删除 DBF 文件（仅允许删除 .dbf 文件，防止泄密）"""
     data = request.json
     filepath = data.get('file', '')
     if not filepath or not os.path.exists(filepath):
         return jsonify({'error': '文件不存在'})
     
-    # 安全检查：仅允许删除 UPLOAD_DIR 下的文件
-    abs_path = os.path.abspath(filepath)
-    abs_upload = os.path.abspath(str(UPLOAD_DIR))
-    if not abs_path.startswith(abs_upload):
-        return jsonify({'error': '安全限制：仅允许删除 uploads 目录下的文件'})
-    
-    # 仅允许删除 .dbf 文件
-    if not abs_path.lower().endswith('.dbf'):
+    # 安全检查：仅允许删除 .dbf 文件
+    if not filepath.lower().endswith('.dbf'):
         return jsonify({'error': '仅允许删除 .dbf 文件'})
     
     try:
-        os.chmod(abs_path, 0o666)
-        os.remove(abs_path)
+        os.chmod(filepath, 0o666)
+        os.remove(filepath)
         # 同时删除可能的缓存文件
         for ext in ['.tmp', '.bak']:
-            cache_path = abs_path + ext
+            cache_path = filepath + ext
             if os.path.exists(cache_path):
                 os.chmod(cache_path, 0o666)
                 os.remove(cache_path)
-        return jsonify({'success': True, 'deleted': os.path.basename(abs_path)})
+        return jsonify({'success': True, 'deleted': os.path.basename(filepath)})
     except Exception as e:
         return jsonify({'error': f'删除失败: {e}'})
 

@@ -501,7 +501,7 @@ body {
       <p style="color:#7f8c8d;text-align:center;">加载中...</p>
     </div>
     <div class="modal-footer">
-      <span style="color:#7f8c8d;font-size:12px;">💡 仅显示上传的文件（uploads 目录），系统默认文件不在此处管理</span>
+      <span style="color:#7f8c8d;font-size:12px;">💡 📌 默认文件 | 📁 上传文件 — 均可删除，操作不可撤销</span>
       <button class="btn btn-outline" onclick="closeModal('file-manager-modal')">关闭</button>
     </div>
   </div>
@@ -580,8 +580,8 @@ async function selectFile(path) {
 
   // 判断当前文件是否来自 uploads 目录（可删除）
   const currentFileInfo = state.allFiles.find(f => f.path === path);
-  const isUpload = currentFileInfo && currentFileInfo.source === 'uploads';
-  document.getElementById('btn-delete-file').style.display = isUpload ? '' : 'none';
+  const isDeletable = currentFileInfo && path.endsWith('.dbf');
+  document.getElementById('btn-delete-file').style.display = isDeletable ? '' : 'none';
 
   showLoading();
   try {
@@ -1350,19 +1350,22 @@ function showFileManager() {
 
 async function renderFileManagerList() {
   const body = document.getElementById('file-manager-body');
-  const uploadsFiles = state.allFiles.filter(f => f.source === 'uploads');
+  const allFiles = state.allFiles;
 
-  if (uploadsFiles.length === 0) {
-    body.innerHTML = '<p style="color:#7f8c8d;text-align:center;padding:20px;">暂无上传的 DBF 文件</p>';
+  if (allFiles.length === 0) {
+    body.innerHTML = '<p style="color:#7f8c8d;text-align:center;padding:20px;">暂无 DBF 文件</p>';
     return;
   }
 
   let html = '';
-  uploadsFiles.forEach((f, i) => {
+  allFiles.forEach((f, i) => {
     const sizeStr = f.size < 1024 ? f.size + ' B' :
                     f.size < 1024*1024 ? (f.size/1024).toFixed(1) + ' KB' :
                     (f.size/(1024*1024)).toFixed(2) + ' MB';
     const isCurrent = state.currentFile === f.path;
+    const isDefault = f.source === 'default';
+    const srcTag = isDefault ? '📌 默认' : '📁 上传';
+    const srcStyle = isDefault ? 'color:#1565c0;' : 'color:#7f8c8d;';
     const borderStyle = isCurrent ? 'border-left:4px solid var(--primary);padding-left:12px;' : '';
     html += `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #eee;${borderStyle}">
@@ -1371,7 +1374,7 @@ async function renderFileManagerList() {
             ${f.name}
             ${isCurrent ? '<span style="background:#4472C4;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;">当前</span>' : ''}
           </div>
-          <div style="font-size:12px;color:#7f8c8d;margin-top:2px;">${sizeStr}</div>
+          <div style="font-size:12px;${srcStyle}margin-top:2px;">${srcTag} · ${sizeStr}</div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;margin-left:12px;">
           <button class="btn btn-outline btn-xs" onclick="selectFile('${f.path.replace(/'/g, "\\'")}');closeModal('file-manager-modal')">📂 打开</button>
@@ -1426,13 +1429,8 @@ async function deleteFileFromManager(path, name) {
 async function deleteCurrentFile() {
   if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
 
-  const currentFileInfo = state.allFiles.find(f => f.path === state.currentFile);
-  if (!currentFileInfo || currentFileInfo.source !== 'uploads') {
-    showToast('仅允许删除上传的 DBF 文件', 'warning');
-    return;
-  }
-
-  if (!confirm(`⚠️ 确认删除文件 "${currentFileInfo.name}"？\n\n此操作不可撤销！`)) return;
+  const fileName = state.currentFile.split('\\').pop().split('/').pop();
+  if (!confirm(`⚠️ 确认删除文件？\n\n"${fileName}"\n\n此操作不可撤销！删除后文件将永久丢失。`)) return;
 
   try {
     const resp = await fetch('/api/file/delete', {
