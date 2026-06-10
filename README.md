@@ -28,7 +28,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/YOUR_USERNAME/dbf-editor.git
+git clone https://github.com/moon9001/dbf-editor.git
 cd dbf-editor
 
 # 2. 创建虚拟环境
