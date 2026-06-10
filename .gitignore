@@ -1,0 +1,27 @@
+# DBF 数据文件（含私密信息）
+*.dbf
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# 上传目录
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# WorkBuddy
+.workbuddy/
+
+# 系统文件
+Thumbs.db
+.DS_Store
+Desktop.ini

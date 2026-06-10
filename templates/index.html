@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DBF 编辑器</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --card-bg: #fff;
+  --text: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --border: #dee2e6;
+  --primary: #4472C4;
+  --primary-hover: #365a9c;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
+  --success: #27ae60;
+  --warning: #f39c12;
+  --table-stripe: #f8f9fa;
+  --table-hover: #e8f0fe;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  background: var(--primary);
+  color: white;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 { font-size: 18px; font-weight: 600; }
+.header .title-sub { font-size: 12px; opacity: 0.85; margin-left: 10px; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+
+/* Buttons */
+.btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.btn-primary { background: #fff; color: var(--primary); }
+.btn-primary:hover { background: #e3ecf9; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #219a52; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+.btn-warning { background: var(--warning); color: #fff; }
+.btn-warning:hover { background: #d68910; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-outline:hover { background: #f0f0f0; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-xs { padding: 3px 8px; font-size: 11px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Layout */
+.main-container {
+  max-width: calc(100vw - 32px);
+  margin: 16px auto;
+  padding: 0 16px;
+}
+
+/* Toolbar */
+.toolbar {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.toolbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 6px; }
+.toolbar input[type="file"] { display: none; }
+.toolbar select, .toolbar input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: #fff;
+}
+.toolbar select:focus, .toolbar input:focus { border-color: var(--primary); }
+.toolbar input[type="text"] { width: 180px; }
+
+/* File info bar */
+.info-bar {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  align-items: center;
+}
+.info-bar strong { color: var(--text); }
+
+/* Table wrapper */
+.table-wrapper {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  position: relative;
+}
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: max-content;
+}
+.table-wrapper thead { position: sticky; top: 0; z-index: 10; }
+.table-wrapper th {
+  background: #667eea;
+  color: #fff;
+  padding: 8px 6px;
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  min-width: 80px;
+  position: relative;
+  border-right: 1px solid rgba(255,255,255,0.2);
+}
+.table-wrapper th:hover { background: #5664d0; }
+.table-wrapper th .sort-icon { font-size: 10px; margin-left: 4px; opacity: 0.5; }
+.table-wrapper th .sort-icon.active { opacity: 1; }
+.table-wrapper td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.table-wrapper tr:nth-child(even) td { background: var(--table-stripe); }
+.table-wrapper tr:hover td { background: var(--table-hover); }
+.table-wrapper td.selected { outline: 2px solid var(--primary); outline-offset: -2px; }
+.table-wrapper td.editing { padding: 2px; }
+.table-wrapper td.editing input, .table-wrapper td.editing textarea {
+  width: 100%;
+  min-height: 28px;
+  border: 2px solid var(--primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+/* Checkbox column */
+.check-col { width: 36px; text-align: center !important; }
+.check-col input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+.pagination .page-btn {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.pagination .page-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pagination .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.pagination .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pagination .page-info { font-size: 13px; color: var(--text-secondary); margin: 0 8px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.2);
+  width: 90vw;
+  max-width: 700px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h3 { font-size: 16px; }
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.modal-close {
+  background: none; border: none; font-size: 22px; cursor: pointer;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+}
+.modal-close:hover { background: #f0f0f0; }
+
+/* Toast */
+.toast {
+  position: fixed; top: 20px; right: 20px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  z-index: 999;
+  display: none;
+  animation: slideIn 0.3s ease;
+  max-width: 400px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+.toast.info { background: var(--primary); }
+.toast.warning { background: var(--warning); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Loading */
+.loading {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Form */
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; outline: none; font-family: inherit;
+}
+.form-group textarea { min-height: 80px; resize: vertical; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); }
+
+.field-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.field-editor .form-group { margin-bottom: 0; }
+
+/* Empty state */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.empty-state svg { width: 64px; height: 64px; margin-bottom: 16px; opacity: 0.4; }
+
+/* Badge */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 500;
+}
+.badge-info { background: #e3f2fd; color: #1565c0; }
+.badge-warning { background: #fff3e0; color: #e65100; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 DBF 编辑器
+      <span class="title-sub" id="header-info"></span>
+    </h1>
+  </div>
+  <div class="header-right">
+    <select id="file-selector" style="padding:6px 10px; border-radius:6px; border:none; font-size:13px; min-width:220px;">
+      <option value="">-- 选择 DBF 文件 --</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="uploadDbf()" style="color:#fff;border-color:rgba(255,255,255,0.4);">📤 上传</button>
+    <button class="btn btn-outline btn-sm" onclick="downloadDbf()" style="color:#fff;border-color:rgba(255,255,255,0.4);">📥 下载</button>
+    <button class="btn btn-outline btn-sm" id="btn-delete-file" onclick="deleteCurrentFile()" style="color:#ffc;border-color:rgba(255,255,255,0.4);display:none;" title="删除当前文件（仅限上传的文件）">🗑 删除</button>
+  </div>
+</div>
+
+<div class="main-container">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="btn btn-outline btn-sm" onclick="refreshData()">🔄 刷新</button>
+    <div class="sep"></div>
+    <button class="btn btn-primary btn-sm" onclick="exportExcel()">📊 导出 Excel</button>
+    <button class="btn btn-outline btn-sm" onclick="exportDbf()">💾 导出 DBF</button>
+    <button class="btn btn-warning btn-sm" onclick="showImportModal()">📥 从 Excel 导入</button>
+    <div class="sep"></div>
+    <button class="btn btn-success btn-sm" onclick="addRow()">➕ 添加行</button>
+    <button class="btn btn-danger btn-sm" onclick="batchDelete()" id="btn-batch-del" disabled>🗑 批量删除</button>
+    <div class="sep"></div>
+    <button class="btn btn-outline btn-sm" onclick="showFileManager()" title="管理上传的 DBF 文件">📂 文件管理</button>
+    <div class="sep"></div>
+    <input type="text" id="search-input" placeholder="🔍 搜索..." onkeydown="if(event.key==='Enter')searchData()">
+    <select id="search-field" style="width:130px;">
+      <option value="__all__">全部字段</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="searchData()">搜索</button>
+    <button class="btn btn-outline btn-sm" onclick="clearSearch()">清除</button>
+    <div class="sep"></div>
+    <button class="btn btn-outline btn-sm" onclick="showCreateModal()">🆕 新建 DBF</button>
+  </div>
+
+  <!-- 字段筛选面板（动态生成，自动检测 DWDM 等编码字段） -->
+  <div class="toolbar" id="field-filter-panel" style="padding:8px 16px;gap:10px;flex-wrap:wrap;min-height:0;display:flex;align-items:center;"></div>
+
+  <!-- File Info -->
+  <div class="info-bar" id="info-bar">
+    <span>📁 <strong id="info-filename">未选择文件</strong></span>
+    <span>📋 字段数: <strong id="info-fields">0</strong></span>
+    <span>📝 总记录: <strong id="info-records">0</strong></span>
+    <span>💾 文件大小: <strong id="info-size">-</strong></span>
+    <span>🔢 显示: <strong id="info-filtered">0</strong> 条</span>
+    <span id="info-dwdm-tag" style="display:none;">🏢 <strong id="info-dwdm-text" style="color:#1565c0;"></strong></span>
+    <span id="info-filter-tags" style="display:none;">🔖 <strong id="info-filter-text" style="color:#e65100;"></strong></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrapper" id="table-wrapper">
+    <div class="empty-state" id="empty-state">
+      <div style="font-size:48px;margin-bottom:12px;">📂</div>
+      <div style="font-size:16px;margin-bottom:6px;">请选择一个 DBF 文件开始编辑</div>
+      <div style="font-size:13px;color:#95a5a6;">支持 .dbf 文件的查看、编辑、搜索、导入导出</div>
+    </div>
+    <table id="data-table" style="display:none;">
+      <thead id="table-head"></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div class="loading" id="loading" style="display:none;"><div class="loading-spinner"></div></div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="edit-modal-title">编辑记录</h3>
+      <button class="modal-close" onclick="closeModal('edit-modal')">×</button>
+    </div>
+    <div class="modal-body" id="edit-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('edit-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Record Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>添加新记录</h3>
+      <button class="modal-close" onclick="closeModal('add-modal')">×</button>
+    </div>
+    <div class="modal-body" id="add-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('add-modal')">取消</button>
+      <button class="btn btn-success" onclick="saveAdd()">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>从 Excel 导入</h3>
+      <button class="modal-close" onclick="closeModal('import-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>选择 Excel 文件 (.xlsx)</label>
+        <input type="file" id="import-file" accept=".xlsx">
+      </div>
+      <div class="form-group">
+        <label>导入方式</label>
+        <select id="import-target">
+          <option value="new">创建新 DBF 文件</option>
+          <option value="existing">追加到当前 DBF</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('import-modal')">取消</button>
+      <button class="btn btn-warning" onclick="doImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create DBF Modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>新建 DBF 文件</h3>
+      <button class="modal-close" onclick="closeModal('create-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>文件名</label>
+        <input type="text" id="create-filename" value="new_table.dbf">
+      </div>
+      <h4 style="margin:12px 0 8px;">字段定义</h4>
+      <div id="create-fields">
+        <div class="field-editor">
+          <div class="form-group"><label>字段名</label><input type="text" class="fld-name" value="ID"></div>
+          <div class="form-group"><label>类型</label><select class="fld-type"><option value="C" selected>C - 字符型</option><option value="N">N - 数值型</option><option value="D">D - 日期型</option><option value="L">L - 逻辑型</option><option value="M">M - 备注型</option></select></div>
+          <div class="form-group"><label>长度</label><input type="number" class="fld-length" value="50" min="1" max="254"></div>
+          <div class="form-group"><label>小数位</label><input type="number" class="fld-decimal" value="0" min="0" max="18"></div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="addFieldRow()">+ 添加字段</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('create-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doCreate()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- File Manager Modal -->
+<div class="modal-overlay" id="file-manager-modal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <h3>📂 文件管理</h3>
+      <button class="modal-close" onclick="closeModal('file-manager-modal')">&times;</button>
+    </div>
+    <div class="modal-body" id="file-manager-body" style="max-height:400px;overflow-y:auto;">
+      <p style="color:#7f8c8d;text-align:center;">加载中...</p>
+    </div>
+    <div class="modal-footer">
+      <span style="color:#7f8c8d;font-size:12px;">💡 仅显示上传的文件（uploads 目录），系统默认文件不在此处管理</span>
+      <button class="btn btn-outline" onclick="closeModal('file-manager-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 全局状态 ====================
+let state = {
+  currentFile: null,
+  info: null,
+  allFiles: [],
+  fieldNames: [],
+  records: [],
+  totalRecords: 0,
+  filteredTotal: 0,
+  page: 1,
+  pageSize: 50,
+  totalPages: 1,
+  selectedCells: new Set(),
+  sortField: null,
+  sortDir: 'asc',
+  // 字段筛选条件 {fieldName: value}
+  fieldFilters: {}
+};
+
+// ==================== Toast ====================
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type}`;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+// ==================== 初始化 ====================
+async function init() {
+  await loadFiles();
+  // 尝试自动加载默认文件
+  const sel = document.getElementById('file-selector');
+  if (sel.options.length > 1) {
+    sel.selectedIndex = 1;
+    await selectFile(sel.value);
+  }
+}
+
+async function loadFiles() {
+  try {
+    const resp = await fetch('/api/files');
+    const data = await resp.json();
+    state.allFiles = data.files || [];
+    const sel = document.getElementById('file-selector');
+    sel.innerHTML = '<option value="">-- 选择 DBF 文件 --</option>';
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.path;
+        const sizeMB = (f.size / 1024 / 1024).toFixed(2);
+        const srcTag = f.source === 'uploads' ? '📁 ' : '📌 ';
+        opt.textContent = `${srcTag}${f.name} [${sizeMB} MB]`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {
+    console.error('加载文件列表失败:', e);
+  }
+}
+
+// ==================== 文件操作 ====================
+async function selectFile(path) {
+  if (!path) return;
+  state.currentFile = path;
+  state.page = 1;
+  document.getElementById('file-selector').value = path;
+
+  // 判断当前文件是否来自 uploads 目录（可删除）
+  const currentFileInfo = state.allFiles.find(f => f.path === path);
+  const isUpload = currentFileInfo && currentFileInfo.source === 'uploads';
+  document.getElementById('btn-delete-file').style.display = isUpload ? '' : 'none';
+
+  showLoading();
+  try {
+    // 加载文件信息
+    const infoResp = await fetch(`/api/info?file=${encodeURIComponent(path)}`);
+    state.info = await infoResp.json();
+
+    if (state.info.error) {
+      showToast(state.info.error, 'error');
+      hideLoading();
+      return;
+    }
+
+    // 更新信息栏
+    document.getElementById('info-filename').textContent = state.info.filename;
+    document.getElementById('info-fields').textContent = state.info.field_count;
+    document.getElementById('info-records').textContent = state.info.record_count;
+    const sizeMB = (state.info.file_size / 1024 / 1024).toFixed(2);
+    document.getElementById('info-size').textContent = sizeMB + ' MB';
+    document.getElementById('header-info').textContent = state.info.filename;
+
+    // 更新搜索字段下拉
+    const sf = document.getElementById('search-field');
+    sf.innerHTML = '<option value="__all__">全部字段</option>';
+    if (state.info.fields) {
+      state.info.fields.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.name;
+        opt.textContent = f.name;
+        sf.appendChild(opt);
+      });
+    }
+
+    // 重置字段筛选状态
+    state.fieldFilters = {};
+
+    // 检测可筛选字段（DWDM、DWMC 等编码类短字段）并构建筛选面板
+    await buildFieldFilterPanel(state.info.fields);
+
+    // 加载数据
+    await refreshData();
+  } catch(e) {
+    showToast('加载失败: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+async function refreshData() {
+  if (!state.currentFile) return;
+  showLoading();
+
+  const search = document.getElementById('search-input').value;
+  const searchField = document.getElementById('search-field').value;
+
+  const params = new URLSearchParams({
+    file: state.currentFile,
+    page: state.page,
+    page_size: state.pageSize,
+    search: search,
+    search_field: searchField
+  });
+
+  // 加入字段筛选条件
+  for (const [field, val] of Object.entries(state.fieldFilters)) {
+    if (val && val !== '__all__') {
+      params.append(`filter_${field}`, val);
+    }
+  }
+
+  try {
+    const resp = await fetch(`/api/data?${params}`);
+    const data = await resp.json();
+    if (data.error) {
+      showToast(data.error, 'error');
+      hideLoading();
+      return;
+    }
+
+    state.records = data.records || [];
+    state.fieldNames = sortFieldNames(data.field_names || []);
+    state.totalRecords = data.total || 0;
+    state.filteredTotal = data.filtered_total || 0;
+    state.totalPages = data.total_pages || 1;
+    state.selectedCells = new Set();
+
+    document.getElementById('info-filtered').textContent = state.filteredTotal;
+    document.getElementById('btn-batch-del').disabled = true;
+
+    // 更新筛选状态标签
+    const filterEntries = Object.entries(state.fieldFilters).filter(([, v]) => v && v !== '__all__');
+    const searchVal = document.getElementById('search-input').value;
+    const filterTags = document.getElementById('info-filter-tags');
+    const filterText = document.getElementById('info-filter-text');
+    const tags = [];
+    if (filterEntries.length > 0) {
+      filterEntries.forEach(([k, v]) => tags.push(`${k}=${v}`));
+    }
+    if (searchVal) tags.push(`搜索="${searchVal}"`);
+    if (tags.length > 0) {
+      filterText.textContent = '筛选中: ' + tags.join('  |  ');
+      filterTags.style.display = '';
+    } else {
+      filterTags.style.display = 'none';
+    }
+
+    renderTable();
+    renderPagination();
+
+    document.getElementById('empty-state').style.display = (state.records.length === 0 ? '' : 'none');
+    document.getElementById('data-table').style.display = (state.records.length === 0 ? 'none' : '');
+  } catch(e) {
+    showToast('加载数据失败: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+// 重要字段列表（在表头高亮显示，且行编辑弹窗中设为只读）
+const HIGHLIGHT_FIELDS = new Set(['XM', 'ZJH', 'DWDM', 'DWMC', 'XBM', 'MZM', 'BKLBM', 'BKZYDM', 'BKZYMC', 'KSDM', 'KSMC']);
+
+// 只读字段（单值字段 / 系统固定字段，不允许在编辑弹窗中修改）
+const READONLY_FIELDS = new Set(['DWDM', 'DWMC']);
+
+// 优先排在前面的字段顺序（按截图的VFP显示顺序）
+const PREFERRED_FIELD_ORDER = [
+  'DWDM','DWMC','XM','KASB','ZJH','ZJHM','CSDM','JGDM','CSRQ',
+  'MZM','XBM','HFM','ZXMMM','XSAWDWM','XSAWDM','BKZYDM','BKZYMC',
+  'BKLBM','KSFSM','KSH','BKDWDM','BKDWMC','BKDSDM','BKDSMC',
+  'BKYXDM','BKYXMC','BKXZDM','BKXZMC','BKZSMC','BKZSDM'
+];
+
+// 对字段列表重新排序（把 PREFERRED 中的字段置顶，其余维持原顺序）
+function sortFieldNames(fieldNames) {
+  const upperMap = {};
+  fieldNames.forEach(f => { upperMap[f.toUpperCase()] = f; });
+  const result = [];
+  // 先按优先顺序放置存在的字段
+  PREFERRED_FIELD_ORDER.forEach(pf => {
+    const real = upperMap[pf.toUpperCase()];
+    if (real) result.push(real);
+  });
+  // 再追加不在优先顺序中的字段
+  fieldNames.forEach(f => {
+    if (!PREFERRED_FIELD_ORDER.includes(f.toUpperCase())) result.push(f);
+  });
+  return result;
+}
+
+// ==================== 渲染表格 ====================
+function renderTable() {
+  const thead = document.getElementById('table-head');
+  const tbody = document.getElementById('table-body');
+
+  // 表头
+  let headHTML = '<tr><th class="check-col"><input type="checkbox" id="select-all" onclick="toggleSelectAll()" title="全选/取消全选"></th>';
+  state.fieldNames.forEach((fld, i) => {
+    const sortIcon = state.sortField === fld ? (state.sortDir === 'asc' ? '▲' : '▼') : '';
+    const isHighlight = HIGHLIGHT_FIELDS.has(fld.toUpperCase());
+    const hlStyle = isHighlight ? 'background:#e67e22;' : '';
+    const hlTitle = isHighlight ? ` 🔑` : '';
+    headHTML += `<th onclick="sortTable('${fld}')" title="点击排序" style="${hlStyle}">
+      ${fld}${hlTitle}<span class="sort-icon ${sortIcon ? 'active' : ''}">${sortIcon}</span>
+    </th>`;
+  });
+  headHTML += '<th style="width:80px;text-align:center;">操作</th>';
+  headHTML += '</tr>';
+  thead.innerHTML = headHTML;
+
+  // 数据行
+  let bodyHTML = '';
+  state.records.forEach((rec, idx) => {
+    const globalIdx = (state.page - 1) * state.pageSize + idx;
+    bodyHTML += '<tr>';
+    bodyHTML += `<td class="check-col"><input type="checkbox" class="row-check" data-index="${globalIdx}" onclick="event.stopPropagation();toggleRow(${globalIdx})"></td>`;
+    state.fieldNames.forEach(fld => {
+      let val = rec[fld] || '';
+      // 截断长文本
+      let displayVal = val.length > 80 ? val.substring(0, 80) + '...' : val;
+      displayVal = displayVal.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const isHL = HIGHLIGHT_FIELDS.has(fld.toUpperCase());
+      const cellStyle = isHL ? ' style="background:#fef9e7;font-weight:500;"' : '';
+      bodyHTML += `<td ondblclick="startEdit(this, ${globalIdx}, '${fld}')" title="双击编辑 | ${fld}"${cellStyle}>${displayVal || '&nbsp;'}</td>`;
+    });
+    bodyHTML += `<td style="text-align:center;white-space:nowrap;">
+      <button class="btn btn-outline btn-xs" onclick="editRowFull(${globalIdx})" title="整行编辑">✏️</button>
+      <button class="btn btn-outline btn-xs" onclick="deleteRow(${globalIdx})" title="删除" style="color:var(--danger);">🗑</button>
+    </td>`;
+    bodyHTML += '</tr>';
+  });
+  tbody.innerHTML = bodyHTML;
+}
+
+// ==================== 分页 ====================
+function renderPagination() {
+  const div = document.getElementById('pagination');
+  if (state.totalPages <= 1) {
+    div.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  html += `<button class="page-btn" onclick="goPage(1)" ${state.page <= 1 ? 'disabled' : ''}>⏮</button>`;
+  html += `<button class="page-btn" onclick="goPage(${state.page - 1})" ${state.page <= 1 ? 'disabled' : ''}>◀</button>`;
+
+  const startPage = Math.max(1, state.page - 3);
+  const endPage = Math.min(state.totalPages, state.page + 3);
+
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="page-btn ${i === state.page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+  }
+
+  html += `<button class="page-btn" onclick="goPage(${state.page + 1})" ${state.page >= state.totalPages ? 'disabled' : ''}>▶</button>`;
+  html += `<button class="page-btn" onclick="goPage(${state.totalPages})" ${state.page >= state.totalPages ? 'disabled' : ''}>⏭</button>`;
+  html += `<span class="page-info">第 ${state.page}/${state.totalPages} 页 共 ${state.filteredTotal} 条</span>`;
+
+  div.innerHTML = html;
+}
+
+function goPage(p) {
+  if (p < 1 || p > state.totalPages || p === state.page) return;
+  state.page = p;
+  refreshData();
+}
+
+// ==================== 字段筛选面板 ====================
+// 需要自动检测并生成筛选下拉的字段白名单（含 DWDM、DWMC 等）
+const FILTER_FIELD_WHITELIST = ['DWDM', 'DWMC', 'XBM', 'KSFSM', 'BKLBM', 'ZXJH', 'XWM', 'XLM', 'KSLYM', 'MZM'];
+
+async function buildFieldFilterPanel(fields) {
+  const panel = document.getElementById('field-filter-panel');
+  panel.innerHTML = '';
+
+  if (!fields || !state.currentFile) return;
+
+  // 找出可筛选字段（白名单中的字段，且长度较短表示是编码字段）
+  const filterFields = fields.filter(f =>
+    FILTER_FIELD_WHITELIST.includes(f.name.toUpperCase()) || f.length <= 10
+  ).slice(0, 8); // 最多显示8个筛选
+
+  if (filterFields.length === 0) return;
+
+  // 并发获取所有候选字段的不重复值
+  const fetches = filterFields.map(f =>
+    fetch(`/api/distinct?file=${encodeURIComponent(state.currentFile)}&field=${f.name}`)
+      .then(r => r.json())
+      .then(d => ({ field: f.name, values: d.values || [] }))
+      .catch(() => ({ field: f.name, values: [] }))
+  );
+  const results = await Promise.all(fetches);
+
+  // 更新信息栏的 DWDM/DWMC 标签
+  const dwdmResult = results.find(r => r.field.toUpperCase() === 'DWDM');
+  const dwmcResult = results.find(r => r.field.toUpperCase() === 'DWMC');
+  const dwdmTag = document.getElementById('info-dwdm-tag');
+  const dwdmText = document.getElementById('info-dwdm-text');
+  if (dwdmTag && dwdmText) {
+    const parts = [];
+    if (dwdmResult && dwdmResult.values.length > 0) parts.push(`代码: ${dwdmResult.values.join('/')}`);
+    if (dwmcResult && dwmcResult.values.length > 0) {
+      const names = dwmcResult.values.map(v => v.length > 15 ? v.substring(0, 15) + '…' : v);
+      parts.push(names.join(' / '));
+    }
+    if (parts.length > 0) {
+      dwdmText.textContent = parts.join('  ');
+      dwdmTag.style.display = '';
+    } else {
+      dwdmTag.style.display = 'none';
+    }
+  }
+
+  // 友好标签名映射
+  const labelNames = {
+    'DWDM': '单位代码', 'DWMC': '单位名称', 'XBM': '性别',
+    'KSFSM': '考试方式', 'BKLBM': '报考类别', 'ZXJH': '专项计划',
+    'XWM': '学位', 'XLM': '学历', 'KSLYM': '考试类型', 'MZM': '民族'
+  };
+
+  results.forEach(({ field, values }) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:12px;color:#7f8c8d;white-space:nowrap;';
+    label.textContent = (labelNames[field.toUpperCase()] || field) + ':';
+
+    if (values.length < 2) {
+      // 单值字段：作为信息标签显示（不可筛选，但可见）
+      const badge = document.createElement('span');
+      badge.style.cssText = 'padding:3px 8px;background:#e8f4fd;border:1px solid #bee3f8;border-radius:12px;font-size:12px;color:#2c7be5;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;';
+      const displayVal = values[0] || '(空)';
+      badge.textContent = displayVal.length > 25 ? displayVal.substring(0, 25) + '…' : displayVal;
+      badge.title = displayVal;
+      wrap.appendChild(label);
+      wrap.appendChild(badge);
+      panel.appendChild(wrap);
+      return;
+    }
+
+    // 多值字段：显示下拉筛选器
+    const sel = document.createElement('select');
+    sel.style.cssText = 'padding:5px 8px;border:1px solid #dee2e6;border-radius:6px;font-size:12px;outline:none;background:#fff;max-width:160px;';
+    sel.dataset.field = field;
+
+    const allOpt = document.createElement('option');
+    allOpt.value = '__all__';
+    allOpt.textContent = `全部(${values.length})`;
+    sel.appendChild(allOpt);
+
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v.length > 20 ? v.substring(0, 20) + '…' : v;
+      opt.title = v;
+      sel.appendChild(opt);
+    });
+
+    sel.addEventListener('change', function() {
+      const val = this.value;
+      if (val === '__all__') {
+        delete state.fieldFilters[field];
+      } else {
+        state.fieldFilters[field] = val;
+      }
+      state.page = 1;
+      refreshData();
+    });
+
+    wrap.appendChild(label);
+    wrap.appendChild(sel);
+    panel.appendChild(wrap);
+  });
+
+  // 如果有任何筛选器被创建，加一个"清除筛选"按钮
+  if (panel.children.length > 0) {
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width:1px;height:24px;background:#dee2e6;margin:0 4px;';
+    panel.appendChild(sep);
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'btn btn-outline btn-sm';
+    clearBtn.textContent = '清除筛选';
+    clearBtn.onclick = clearAllFilters;
+    panel.appendChild(clearBtn);
+  }
+}
+
+function clearAllFilters() {
+  state.fieldFilters = {};
+  // 重置所有筛选下拉
+  document.querySelectorAll('#field-filter-panel select').forEach(sel => {
+    sel.value = '__all__';
+  });
+  state.page = 1;
+  refreshData();
+}
+
+// ==================== 搜索 ====================
+function searchData() {
+  state.page = 1;
+  refreshData();
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-field').value = '__all__';
+  state.page = 1;
+  refreshData();
+}
+
+// ==================== 排序 ====================
+function sortTable(field) {
+  if (state.sortField === field) {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.sortField = field;
+    state.sortDir = 'asc';
+  }
+
+  state.records.sort((a, b) => {
+    const va = a[field] || '';
+    const vb = b[field] || '';
+    const cmp = va.localeCompare(vb, 'zh-CN');
+    return state.sortDir === 'asc' ? cmp : -cmp;
+  });
+  renderTable();
+}
+
+// ==================== 编辑 ====================
+function startEdit(td, rowIdx, field) {
+  // 只读字段不允许双击编辑
+  if (READONLY_FIELDS.has(field.toUpperCase())) {
+    showToast(`字段 ${field} 为系统固定字段，不可修改`, 'warning');
+    return;
+  }
+  const currentVal = state.records[Math.floor((rowIdx - (state.page - 1) * state.pageSize) % state.pageSize)][field] || '';
+  const isLong = currentVal.length > 50;
+  const inputHTML = isLong
+    ? `<textarea>${currentVal.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>`
+    : `<input type="text" value="${currentVal.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}">`;
+
+  td.classList.add('editing');
+  td.innerHTML = inputHTML;
+  const input = td.querySelector('input, textarea');
+  input.focus();
+
+  input.addEventListener('blur', async () => {
+    const newVal = input.value;
+    td.classList.remove('editing');
+    td.innerHTML = newVal || '&nbsp;';
+    await doUpdate(rowIdx, field, newVal);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !isLong) { input.blur(); }
+    if (e.key === 'Escape') {
+      td.classList.remove('editing');
+      td.innerHTML = currentVal || '&nbsp;';
+    }
+  });
+}
+
+async function doUpdate(rowIdx, field, value) {
+  try {
+    const resp = await fetch('/api/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        file: state.currentFile,
+        index: rowIdx,
+        updates: {[field]: value}
+      })
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('更新失败: ' + result.error, 'error');
+    } else {
+      showToast('已保存 ✓', 'success');
+    }
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
+function editRowFull(rowIdx) {
+  const localIdx = Math.floor((rowIdx - (state.page - 1) * state.pageSize) % state.pageSize);
+  const record = state.records[localIdx];
+  const fields = state.info.fields;
+
+  // 按优先顺序重排字段列表
+  const sortedFields = [...fields].sort((a, b) => {
+    const ai = PREFERRED_FIELD_ORDER.indexOf(a.name.toUpperCase());
+    const bi = PREFERRED_FIELD_ORDER.indexOf(b.name.toUpperCase());
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
+  let html = '';
+  sortedFields.forEach(f => {
+    const val = record[f.name] || '';
+    const isLong = f.length > 80;
+    const isRO = READONLY_FIELDS.has(f.name.toUpperCase());
+    const roAttr = isRO ? ' disabled style="background:#f0f4f8;color:#555;cursor:not-allowed;"' : '';
+    const roLabel = isRO ? ' <span class="badge" style="background:#aaa;color:#fff;font-size:10px;padding:1px 5px;">只读</span>' : '';
+    const inputTag = isLong
+      ? `<textarea style="min-height:60px;"${roAttr}>${val.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>`
+      : `<input type="text" value="${val.replace(/"/g, '&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"${roAttr}>`;
+    html += `<div class="form-group">
+      <label>${f.name}${roLabel} <span class="badge badge-info">${f.type}(${f.length})</span></label>
+      ${inputTag}
+    </div>`;
+  });
+
+  document.getElementById('edit-modal-body').innerHTML = html;
+  document.getElementById('edit-modal').dataset.rowIdx = rowIdx;
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+async function saveEdit() {
+  const rowIdx = parseInt(document.getElementById('edit-modal').dataset.rowIdx);
+  const inputs = document.querySelectorAll('#edit-modal-body input:not([disabled]), #edit-modal-body textarea:not([disabled])');
+  const allGroups = document.querySelectorAll('#edit-modal-body .form-group');
+  const fields = state.info.fields;
+
+  // 按实际排列的字段（和editRowFull保持一致的排序）
+  const sortedFields = [...fields].sort((a, b) => {
+    const ai = PREFERRED_FIELD_ORDER.indexOf(a.name.toUpperCase());
+    const bi = PREFERRED_FIELD_ORDER.indexOf(b.name.toUpperCase());
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
+  const updates = {};
+  let inputIdx = 0;
+  sortedFields.forEach(f => {
+    if (READONLY_FIELDS.has(f.name.toUpperCase())) return; // 跳过只读字段
+    const inp = inputs[inputIdx];
+    if (inp) {
+      updates[f.name] = inp.value;
+      inputIdx++;
+    }
+  });
+
+  try {
+    const resp = await fetch('/api/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file: state.currentFile, index: rowIdx, updates})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('更新失败: ' + result.error, 'error');
+    } else {
+      showToast('已保存 ✓', 'success');
+      closeModal('edit-modal');
+      refreshData();
+    }
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// ==================== 添加/删除行 ====================
+function addRow() {
+  if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
+  const fields = state.info.fields;
+
+  // 按优先顺序排列字段
+  const sortedFields = [...fields].sort((a, b) => {
+    const ai = PREFERRED_FIELD_ORDER.indexOf(a.name.toUpperCase());
+    const bi = PREFERRED_FIELD_ORDER.indexOf(b.name.toUpperCase());
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
+  // 获取只读字段的当前值（从第一条记录）
+  const firstRec = state.records[0] || {};
+
+  let html = '';
+  sortedFields.forEach(f => {
+    const isRO = READONLY_FIELDS.has(f.name.toUpperCase());
+    const defaultVal = isRO ? (firstRec[f.name] || '') : '';
+    const roAttr = isRO ? ' disabled style="background:#f0f4f8;color:#555;cursor:not-allowed;"' : '';
+    const roLabel = isRO ? ' <span class="badge" style="background:#aaa;color:#fff;font-size:10px;padding:1px 5px;">自动填入</span>' : '';
+    html += `<div class="form-group">
+      <label>${f.name}${roLabel} <span class="badge badge-info">${f.type}(${f.length})</span></label>
+      <input type="text" value="${defaultVal.replace(/"/g, '&quot;')}" placeholder="输入 ${f.name}"${roAttr}>
+    </div>`;
+  });
+
+  document.getElementById('add-modal-body').innerHTML = html;
+  document.getElementById('add-modal').classList.add('show');
+}
+
+async function saveAdd() {
+  // 取所有 input（包括 disabled，因为要把 DWDM 等值也提交）
+  const inputs = document.querySelectorAll('#add-modal-body input');
+  const fields = state.info.fields;
+
+  // 按优先顺序排列（和addRow保持一致）
+  const sortedFields = [...fields].sort((a, b) => {
+    const ai = PREFERRED_FIELD_ORDER.indexOf(a.name.toUpperCase());
+    const bi = PREFERRED_FIELD_ORDER.indexOf(b.name.toUpperCase());
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  });
+
+  const record = {};
+  // 收集所有字段（含disabled）
+  const allInputs = document.querySelectorAll('#add-modal-body input');
+  sortedFields.forEach((f, i) => {
+    record[f.name] = allInputs[i] ? allInputs[i].value : '';
+  });
+
+  try {
+    const resp = await fetch('/api/add', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file: state.currentFile, record})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('添加失败: ' + result.error, 'error');
+    } else {
+      showToast('已添加 ✓', 'success');
+      closeModal('add-modal');
+      await refreshData();
+    }
+  } catch(e) {
+    showToast('添加失败: ' + e.message, 'error');
+  }
+}
+
+async function deleteRow(rowIdx) {
+  if (!confirm(`确定要删除第 ${rowIdx + 1} 条记录吗？此操作不可撤销！`)) return;
+
+  try {
+    const resp = await fetch('/api/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file: state.currentFile, index: rowIdx})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('删除失败: ' + result.error, 'error');
+    } else {
+      showToast('已删除 ✓', 'success');
+      if (state.records.length === 1 && state.page > 1) state.page--;
+      await refreshData();
+    }
+  } catch(e) {
+    showToast('删除失败: ' + e.message, 'error');
+  }
+}
+
+// ==================== 批量操作 ====================
+function toggleSelectAll() {
+  const checkAll = document.getElementById('select-all');
+  const checks = document.querySelectorAll('.row-check');
+  state.selectedCells.clear();
+  checks.forEach(cb => {
+    cb.checked = checkAll.checked;
+    if (checkAll.checked) state.selectedCells.add(parseInt(cb.dataset.index));
+  });
+  updateBatchBtn();
+}
+
+function toggleRow(idx) {
+  if (state.selectedCells.has(idx)) {
+    state.selectedCells.delete(idx);
+  } else {
+    state.selectedCells.add(idx);
+  }
+  updateBatchBtn();
+}
+
+function updateBatchBtn() {
+  document.getElementById('btn-batch-del').disabled = state.selectedCells.size === 0;
+}
+
+async function batchDelete() {
+  if (state.selectedCells.size === 0) return;
+  if (!confirm(`确定要删除选中的 ${state.selectedCells.size} 条记录吗？此操作不可撤销！`)) return;
+
+  try {
+    const resp = await fetch('/api/batch_delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        file: state.currentFile,
+        indices: Array.from(state.selectedCells)
+      })
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('批量删除失败: ' + result.error, 'error');
+    } else {
+      showToast(`已删除 ${state.selectedCells.size} 条记录 ✓`, 'success');
+      state.selectedCells.clear();
+      await refreshData();
+    }
+  } catch(e) {
+    showToast('批量删除失败: ' + e.message, 'error');
+  }
+}
+
+// ==================== 导出 Excel ====================
+function exportExcel() {
+  if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
+  window.open(`/api/export/excel?file=${encodeURIComponent(state.currentFile)}`, '_blank');
+}
+
+// ==================== 导出 DBF ====================
+function exportDbf() {
+  if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
+  window.open(`/api/export/dbf?file=${encodeURIComponent(state.currentFile)}`, '_blank');
+  showToast('正在下载 DBF 文件（原格式）...', 'success');
+}
+
+// ==================== 导入 Excel ====================
+function showImportModal() {
+  document.getElementById('import-modal').classList.add('show');
+}
+
+async function doImport() {
+  const fileInput = document.getElementById('import-file');
+  if (!fileInput.files[0]) { showToast('请选择Excel文件', 'error'); return; }
+
+  const formData = new FormData();
+  formData.append('excel_file', fileInput.files[0]);
+  if (state.currentFile) {
+    formData.append('file', state.currentFile);
+  }
+  formData.append('target', document.getElementById('import-target').value);
+
+  showLoading();
+  try {
+    const resp = await fetch('/api/import/excel', {
+      method: 'POST',
+      body: formData
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('导入失败: ' + result.error, 'error');
+    } else {
+      showToast('导入成功 ✓', 'success');
+      closeModal('import-modal');
+      await loadFiles();
+      if (result.path) {
+        selectFile(result.path);
+      } else {
+        await refreshData();
+      }
+    }
+  } catch(e) {
+    showToast('导入失败: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+// ==================== 上传/下载 DBF ====================
+function uploadDbf() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.dbf';
+  input.onchange = async () => {
+    if (!input.files[0]) return;
+    const formData = new FormData();
+    formData.append('dbf_file', input.files[0]);
+
+    showLoading();
+    try {
+      const resp = await fetch('/api/upload', {method: 'POST', body: formData});
+      const result = await resp.json();
+      if (result.error) {
+        showToast('上传失败: ' + result.error, 'error');
+      } else {
+        showToast('上传成功 ✓', 'success');
+        await loadFiles();
+        selectFile(result.path);
+      }
+    } catch(e) {
+      showToast('上传失败: ' + e.message, 'error');
+    }
+    hideLoading();
+  };
+  input.click();
+}
+
+function downloadDbf() {
+  if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
+  window.open(`/api/download?file=${encodeURIComponent(state.currentFile)}`, '_blank');
+}
+
+// ==================== 文件管理面板 ====================
+function showFileManager() {
+  document.getElementById('file-manager-modal').classList.add('show');
+  renderFileManagerList();
+}
+
+async function renderFileManagerList() {
+  const body = document.getElementById('file-manager-body');
+  const uploadsFiles = state.allFiles.filter(f => f.source === 'uploads');
+
+  if (uploadsFiles.length === 0) {
+    body.innerHTML = '<p style="color:#7f8c8d;text-align:center;padding:20px;">暂无上传的 DBF 文件</p>';
+    return;
+  }
+
+  let html = '';
+  uploadsFiles.forEach((f, i) => {
+    const sizeStr = f.size < 1024 ? f.size + ' B' :
+                    f.size < 1024*1024 ? (f.size/1024).toFixed(1) + ' KB' :
+                    (f.size/(1024*1024)).toFixed(2) + ' MB';
+    const isCurrent = state.currentFile === f.path;
+    const borderStyle = isCurrent ? 'border-left:4px solid var(--primary);padding-left:12px;' : '';
+    html += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid #eee;${borderStyle}">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${f.name}
+            ${isCurrent ? '<span style="background:#4472C4;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;">当前</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:#7f8c8d;margin-top:2px;">${sizeStr}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;margin-left:12px;">
+          <button class="btn btn-outline btn-xs" onclick="selectFile('${f.path.replace(/'/g, "\\'")}');closeModal('file-manager-modal')">📂 打开</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteFileFromManager('${f.path.replace(/'/g, "\\'")}', '${f.name.replace(/'/g, "\\'")}')">🗑 删除</button>
+        </div>
+      </div>`;
+  });
+
+  body.innerHTML = html;
+}
+
+async function deleteFileFromManager(path, name) {
+  if (!confirm(`⚠️ 确认删除文件？\n\n"${name}"\n\n此操作不可撤销！`)) return;
+
+  try {
+    const resp = await fetch('/api/file/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file: path})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('删除失败: ' + result.error, 'error');
+    } else {
+      showToast(`已删除: ${result.deleted}`, 'success');
+      // 如果删除的是当前打开的文件，清空页面
+      if (state.currentFile === path) {
+        state.currentFile = null;
+        state.info = null;
+        state.records = [];
+        document.getElementById('btn-delete-file').style.display = 'none';
+        document.getElementById('info-filename').textContent = '未选择文件';
+        document.getElementById('info-fields').textContent = '0';
+        document.getElementById('info-records').textContent = '0';
+        document.getElementById('info-size').textContent = '-';
+        document.getElementById('info-filtered').textContent = '0';
+        document.getElementById('table-head').innerHTML = '';
+        document.getElementById('table-body').innerHTML = '';
+        document.getElementById('pagination').innerHTML = '';
+        document.getElementById('empty-state').style.display = '';
+        document.getElementById('field-filter-panel').innerHTML = '';
+      }
+      // 刷新文件列表和管理面板
+      await loadFiles();
+      renderFileManagerList();
+    }
+  } catch(e) {
+    showToast('删除失败: ' + e.message, 'error');
+  }
+}
+
+async function deleteCurrentFile() {
+  if (!state.currentFile) { showToast('请先选择文件', 'error'); return; }
+
+  const currentFileInfo = state.allFiles.find(f => f.path === state.currentFile);
+  if (!currentFileInfo || currentFileInfo.source !== 'uploads') {
+    showToast('仅允许删除上传的 DBF 文件', 'warning');
+    return;
+  }
+
+  if (!confirm(`⚠️ 确认删除文件 "${currentFileInfo.name}"？\n\n此操作不可撤销！`)) return;
+
+  try {
+    const resp = await fetch('/api/file/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({file: state.currentFile})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('删除失败: ' + result.error, 'error');
+    } else {
+      showToast(`已删除: ${result.deleted}`, 'success');
+      state.currentFile = null;
+      state.info = null;
+      state.records = [];
+      document.getElementById('btn-delete-file').style.display = 'none';
+      document.getElementById('info-filename').textContent = '未选择文件';
+      document.getElementById('info-fields').textContent = '0';
+      document.getElementById('info-records').textContent = '0';
+      document.getElementById('info-size').textContent = '-';
+      document.getElementById('info-filtered').textContent = '0';
+      document.getElementById('table-head').innerHTML = '';
+      document.getElementById('table-body').innerHTML = '';
+      document.getElementById('pagination').innerHTML = '';
+      document.getElementById('empty-state').style.display = '';
+      document.getElementById('field-filter-panel').innerHTML = '';
+      await loadFiles();
+    }
+  } catch(e) {
+    showToast('删除失败: ' + e.message, 'error');
+  }
+}
+
+// ==================== 新建 DBF ====================
+function showCreateModal() {
+  document.getElementById('create-modal').classList.add('show');
+}
+
+function addFieldRow() {
+  const div = document.createElement('div');
+  div.className = 'field-editor';
+  div.innerHTML = `
+    <div class="form-group"><label>字段名</label><input type="text" class="fld-name" value="FIELD"></div>
+    <div class="form-group"><label>类型</label><select class="fld-type"><option value="C" selected>C - 字符型</option><option value="N">N - 数值型</option><option value="D">D - 日期型</option><option value="L">L - 逻辑型</option></select></div>
+    <div class="form-group"><label>长度</label><input type="number" class="fld-length" value="50" min="1" max="254"></div>
+    <div class="form-group"><label>小数位</label><input type="number" class="fld-decimal" value="0" min="0"></div>
+    <button class="btn btn-outline btn-xs" onclick="this.parentElement.remove()" style="align-self:flex-end;">删除</button>
+  `;
+  document.getElementById('create-fields').appendChild(div);
+}
+
+async function doCreate() {
+  const filename = document.getElementById('create-filename').value.trim();
+  if (!filename) { showToast('请输入文件名', 'error'); return; }
+
+  const fieldEditors = document.querySelectorAll('#create-fields .field-editor');
+  const fields = [];
+  fieldEditors.forEach(div => {
+    const name = div.querySelector('.fld-name').value.trim();
+    const type = div.querySelector('.fld-type').value;
+    const length = parseInt(div.querySelector('.fld-length').value) || 50;
+    const decimal = parseInt(div.querySelector('.fld-decimal').value) || 0;
+    if (name) fields.push({name, type, length, decimal});
+  });
+
+  if (fields.length === 0) { showToast('至少需要一个字段', 'error'); return; }
+
+  try {
+    const resp = await fetch('/api/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({filename, fields})
+    });
+    const result = await resp.json();
+    if (result.error) {
+      showToast('创建失败: ' + result.error, 'error');
+    } else {
+      showToast('创建成功 ✓', 'success');
+      closeModal('create-modal');
+      await loadFiles();
+      selectFile(result.path);
+    }
+  } catch(e) {
+    showToast('创建失败: ' + e.message, 'error');
+  }
+}
+
+// ==================== 模态框 ====================
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ==================== 加载状态 ====================
+function showLoading() {
+  document.getElementById('loading').style.display = 'flex';
+}
+function hideLoading() {
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ==================== 热键 ====================
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    showToast('数据已自动保存', 'info');
+  }
+  if (e.ctrlKey && e.key === 'f') {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
+  }
+});
+
+// 文件选择器变化
+document.getElementById('file-selector').addEventListener('change', function() {
+  if (this.value) selectFile(this.value);
+});
+
+// 关闭模态框
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === this) closeModal(this.id);
+  });
+});
+
+// 启动
+init();
+</script>
+</body>
+</html>
